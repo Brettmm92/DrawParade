@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawing Race</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap');
+
+  :root {
+    --sky-top: #0a0520;
+    --sky-mid: #1a1050;
+    --sky-bot: #2d1b6e;
+    --ground-top: #1a3a1a;
+    --ground-bot: #0d1f0d;
+    --accent: #ff6eb4;
+    --accent2: #7ef7c8;
+    --ui-bg: rgba(10,5,30,0.85);
+    --border: rgba(255,255,255,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: #000;
+    color: #fff;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TABS ── */
+  #tabs {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px 0;
+    position: relative;
+    z-index: 20;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1rem;
+    padding: 6px 22px;
+    border-radius: 20px 20px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    text-shadow: 0 0 12px rgba(255,110,180,0.8);
+  }
+  #tab-count {
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.75rem;
+    margin-left: auto;
+    align-self: center;
+    opacity: 0.5;
+    padding-bottom: 4px;
+  }
+
+  /* ── PANELS ── */
+  .panel { display: none; flex: 1; overflow: hidden; }
+  .panel.active { display: flex; }
+
+  /* ── DRAW PANEL ── */
+  #panel-draw {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 16px;
+    gap: 12px;
+    background: radial-gradient(ellipse at 50% 0%, #2a1050 0%, #080314 70%);
+    overflow-y: auto;
+  }
+
+  #draw-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    background: var(--ui-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 10px 16px;
+    width: 100%;
+    max-width: 520px;
+  }
+  #draw-toolbar label { font-size: 0.78rem; opacity: 0.7; }
+
+  .tool-btn {
+    font-family: 'Fredoka One', cursive;
+    padding: 5px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.07);
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { background: rgba(255,255,255,0.15); }
+  #history-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .tool-btn.active-tool {
+    background: var(--accent2);
+    color: #000;
+    border-color: var(--accent2);
+  }
+
+  input[type=range] {
+    accent-color: var(--accent);
+    width: 70px;
+  }
+
+  /* ── CUSTOM COLOR BUTTON ── */
+  #color-btn-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  #color-swatch {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.35);
+    cursor: pointer;
+    box-shadow: 0 0 0 0 rgba(255,255,255,0);
+    transition: box-shadow 0.2s, transform 0.15s;
+    flex-shrink: 0;
+  }
+  #color-swatch:hover { transform: scale(1.1); box-shadow: 0 0 0 3px rgba(255,255,255,0.2); }
+  #color-swatch.picker-open { box-shadow: 0 0 0 3px var(--accent); }
+
+  /* The real input is hidden, positioned BELOW the swatch so picker opens downward */
+  #color-pick {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 4px;
+    width: 0; height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ── DRAW LAYOUT: sidebar + canvas ── */
+  #draw-main {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* ── PALETTE SIDEBAR ── */
+  #palette-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 6px;
+    background: var(--ui-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    flex-shrink: 0;
+  }
+  #palette-sidebar .pal-label {
+    font-size: 0.6rem;
+    opacity: 0.45;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    margin-bottom: 2px;
+  }
+  .pal-swatch {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+  }
+  .pal-swatch:hover { transform: scale(1.18); border-color: rgba(255,255,255,0.5); }
+  .pal-swatch.active-swatch {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.3), 0 0 8px rgba(255,255,255,0.2);
+    transform: scale(1.15);
+  }
+
+  #canvas-wrap {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    box-shadow: 0 0 40px rgba(126,247,200,0.1);
+    touch-action: none;
+    flex: 1;
+  }
+  /* Hide default cursor over canvas — we draw our own */
+  #canvas-wrap, #draw-canvas { cursor: none; }
+  #draw-canvas {
+    display: block;
+    background: #fff;
+    width: 100%;
+  }
+
+  /* ── BULLSEYE CURSOR ── */
+  #brush-cursor {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    display: none;
+    transition: width 0.08s, height 0.08s;
+  }
+
+  #save-btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    padding: 10px 36px;
+    border-radius: 24px;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #c94bff);
+    color: #fff;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    box-shadow: 0 4px 24px rgba(255,110,180,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  #save-btn:hover { transform: scale(1.05); box-shadow: 0 6px 32px rgba(255,110,180,0.6); }
+  #save-btn:active { transform: scale(0.97); }
+
+  #save-msg {
+    font-size: 0.85rem;
+    color: var(--accent2);
+    min-height: 1.2em;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #save-msg.show { opacity: 1; }
+
+  /* ── RACE PANEL ── */
+  #panel-race {
+    position: relative;
+    overflow: hidden;
+  }
+
+  #race-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  #empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    pointer-events: none;
+    text-align: center;
+    padding: 20px;
+  }
+  #empty-state h2 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(255,110,180,0.5);
+  }
+  #empty-state p { opacity: 0.5; font-size: 0.95rem; max-width: 280px; }
+
+  /* ── INSTRUCTIONS + OBSERVE BTN ── */
+  #draw-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  #draw-instructions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 18px;
+    font-size: 0.78rem;
+    opacity: 0.5;
+    letter-spacing: 0.02em;
+  }
+  #draw-instructions span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  #draw-instructions .step-num {
+    font-family: 'Fredoka One', cursive;
+    font-size: 0.7rem;
+    background: rgba(255,255,255,0.12);
+    border-radius: 50%;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  #observe-btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 0.95rem;
+    padding: 8px 28px;
+    border-radius: 24px;
+    border: 1.5px solid var(--accent2);
+    background: rgba(126,247,200,0.08);
+    color: var(--accent2);
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    box-shadow: 0 0 16px rgba(126,247,200,0.1);
+    transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+    display: none; /* hidden until first save */
+  }
+  #observe-btn:hover {
+    background: rgba(126,247,200,0.18);
+    box-shadow: 0 0 28px rgba(126,247,200,0.25);
+    transform: scale(1.04);
+  }
+  #observe-btn:active { transform: scale(0.97); }
+  #observe-btn.visible { display: block; }
+
+  /* ── ACTION SIDEBAR (right of canvas) ── */
+  #action-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 6px;
+    background: var(--ui-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    flex-shrink: 0;
+  }
+  #action-sidebar .pal-label {
+    font-size: 0.6rem;
+    opacity: 0.45;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    margin-bottom: 2px;
+  }
+  .action-btn {
+    font-family: 'Fredoka One', cursive;
+    width: 48px;
+    padding: 6px 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.75rem;
+    text-align: center;
+    transition: background 0.15s, opacity 0.2s;
+    line-height: 1.3;
+  }
+  .action-btn:hover { background: rgba(255,255,255,0.14); }
+  .action-btn.dimmed { opacity: 0.3; pointer-events: none; }
+  #btn-clear-side {
+    border-color: rgba(255,80,80,0.3);
+    color: #ff8888;
+  }
+  #btn-clear-side:hover { background: rgba(255,80,80,0.12); }
+
+  /* ── MUSIC BUTTON ── */
+  #music-btn {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 0.85rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.45);
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+    transition: background 0.18s, color 0.18s;
+    letter-spacing: 0.03em;
+  }
+  #music-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  #music-btn.playing { color: var(--accent2); border-color: var(--accent2); }
+
+  /* ── PALETTE PREVIEW ── */
+  #palette-pill {
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    display: flex;
+    gap: 4px;
+    background: rgba(0,0,0,0.4);
+    padding: 4px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    z-index: 10;
+    pointer-events: none;
+  }
+  .pal-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+</style>
+</head>
+<body>
+
+<div id="tabs">
+  <button class="tab-btn active" data-tab="draw">✏️ Draw</button>
+  <button class="tab-btn" data-tab="race">🏁 Race</button>
+  <span id="tab-count"></span>
+</div>
+
+<!-- BULLSEYE CURSOR -->
+<div id="brush-cursor"></div>
+
+<!-- DRAW -->
+<div id="panel-draw" class="panel active">
+  <div id="draw-toolbar">
+    <div id="color-btn-wrap">
+      <div id="color-swatch" title="Choose color"></div>
+      <input type="color" id="color-pick" value="#222222">
+    </div>
+
+    <label>Size</label>
+    <input type="range" id="brush-size" min="2" max="40" value="8">
+
+    <button class="tool-btn active-tool" id="btn-pen">✏️ Pen</button>
+    <button class="tool-btn" id="btn-eraser">🧹 Eraser</button>
+  </div>
+
+  <div id="draw-main">
+    <!-- Palette sidebar (left) -->
+    <div id="palette-sidebar">
+      <span class="pal-label">Colors</span>
+    </div>
+
+    <div id="canvas-wrap">
+      <canvas id="draw-canvas" width="400" height="280"></canvas>
+    </div>
+
+    <!-- Action sidebar (right) -->
+    <div id="action-sidebar">
+      <span class="pal-label">Edit</span>
+      <button class="action-btn dimmed" id="btn-undo" title="Undo (Ctrl+Z)">↩<br>Undo</button>
+      <button class="action-btn dimmed" id="btn-redo" title="Redo (Ctrl+Y)">↪<br>Redo</button>
+      <div style="width:28px;height:1px;background:rgba(255,255,255,0.1);margin:2px 0"></div>
+      <button class="action-btn" id="btn-clear-side" title="Clear canvas">🗑️<br>Clear</button>
+    </div>
+  </div>
+
+  <div id="draw-footer">
+    <button id="save-btn">Add to Race ➜</button>
+    <div id="save-msg"></div>
+    <button id="observe-btn">👁 Observe Race</button>
+    <div id="draw-instructions">
+      <span><span class="step-num">1</span> Draw your racer</span>
+      <span><span class="step-num">2</span> Add it to the race</span>
+      <span><span class="step-num">3</span> Watch it go! 🏁</span>
+      <span><span class="step-num">4</span> Add competition 😈</span>
+    </div>
+  </div>
+</div>
+
+<!-- RACE -->
+<div id="panel-race" class="panel">
+  <canvas id="race-canvas"></canvas>
+  <div id="empty-state">
+    <h2>No racers yet!</h2>
+    <p>Head to Draw and create something. Every drawing joins the race.</p>
+  </div>
+  <button id="music-btn">🎵 Music: Off</button>
+  <div id="palette-pill"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  PALETTE SYSTEM
+// ═══════════════════════════════════════════════════
+const PALETTES = [
+  {
+    name: "Midnight Bloom",
+    skyTop: "#050118", skyMid: "#15054a", skyBot: "#3d1a7a",
+    groundTop: "#1a3320", groundMid: "#0d2214", groundBot: "#060e08",
+    starColor: "#e8d5ff",
+    accent: "#c060ff", accent2: "#60ffc0",
+    groundGlow: "#1a6b2a"
+  },
+  {
+    name: "Ember Drift",
+    skyTop: "#0d0505", skyMid: "#3d1010", skyBot: "#7a2010",
+    groundTop: "#2a1800", groundMid: "#180e00", groundBot: "#0a0500",
+    starColor: "#ffe8c0",
+    accent: "#ff7030", accent2: "#ffcc40",
+    groundGlow: "#5a2800"
+  },
+  {
+    name: "Deep Ocean",
+    skyTop: "#020810", skyMid: "#041830", skyBot: "#083560",
+    groundTop: "#0a2a1a", groundMid: "#061510", groundBot: "#020808",
+    starColor: "#c0e8ff",
+    accent: "#20b0ff", accent2: "#40ffd0",
+    groundGlow: "#0a3d20"
+  },
+  {
+    name: "Aurora",
+    skyTop: "#040810", skyMid: "#0a1530", skyBot: "#102040",
+    groundTop: "#101a10", groundMid: "#080e08", groundBot: "#040604",
+    starColor: "#d0ffe8",
+    accent: "#30ffa0", accent2: "#a030ff",
+    groundGlow: "#154a15"
+  },
+  {
+    name: "Cotton Candy",
+    skyTop: "#100515", skyMid: "#2d0a3d", skyBot: "#501060",
+    groundTop: "#1a0a2a", groundMid: "#0e051a", groundBot: "#060308",
+    starColor: "#ffe0ff",
+    accent: "#ff60d0", accent2: "#60c0ff",
+    groundGlow: "#3d0a3d"
+  }
+];
+
+// Pick palette for this session (stored so it's consistent until refresh)
+const PAL_KEY = 'drawrace_palette_idx';
+let palIdx = parseInt(sessionStorage.getItem(PAL_KEY));
+if (isNaN(palIdx)) {
+  palIdx = Math.floor(Math.random() * PALETTES.length);
+  sessionStorage.setItem(PAL_KEY, palIdx);
+}
+const PAL = PALETTES[palIdx];
+
+// Apply CSS vars
+document.documentElement.style.setProperty('--accent', PAL.accent);
+document.documentElement.style.setProperty('--accent2', PAL.accent2);
+
+// palette pill
+const pill = document.getElementById('palette-pill');
+[PAL.accent, PAL.skyBot, PAL.accent2, PAL.groundGlow].forEach(c => {
+  const d = document.createElement('div');
+  d.className = 'pal-dot';
+  d.style.background = c;
+  pill.appendChild(d);
+});
+
+// ═══════════════════════════════════════════════════
+//  TAB SWITCHING
+// ═══════════════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'race') { startRace(); resumeChaosTick(); }
+    else pauseChaosTick();
+  });
+});
+
+// ═══════════════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════════════
+const drawCanvas = document.getElementById('draw-canvas');
+const ctx = drawCanvas.getContext('2d');
+let isDrawing = false, lastX = 0, lastY = 0, erasing = false;
+let currentColor = '#222222';
+
+// ── Responsive canvas ──
+function resizeDrawCanvas() {
+  const main = document.getElementById('draw-main');
+  const sidebar = document.getElementById('palette-sidebar');
+  const maxW = Math.min(window.innerWidth - 32, 560);
+  const sideW = sidebar.offsetWidth + 10;
+  const canvasW = maxW - sideW;
+  const scale = canvasW / 400;
+  drawCanvas.style.height = Math.round(280 * scale) + 'px';
+}
+resizeDrawCanvas();
+window.addEventListener('resize', resizeDrawCanvas);
+
+// ── Bullseye cursor ──
+const brushCursor = document.getElementById('brush-cursor');
+const canvasWrap = document.getElementById('canvas-wrap');
+
+function updateCursorStyle() {
+  const size = parseInt(document.getElementById('brush-size').value);
+  // Map canvas px → screen px (approximate via displayed canvas width)
+  const rect = drawCanvas.getBoundingClientRect();
+  const scaleFactor = rect.width / 400;
+  const screenSize = Math.max(4, size * scaleFactor);
+
+  brushCursor.style.width = screenSize + 'px';
+  brushCursor.style.height = screenSize + 'px';
+
+  if (erasing) {
+    brushCursor.style.background = 'transparent';
+    brushCursor.style.border = '2px solid #000';
+    brushCursor.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6)';
+  } else {
+    brushCursor.style.background = currentColor;
+    brushCursor.style.border = '1.5px solid rgba(255,255,255,0.7)';
+    brushCursor.style.boxShadow = `0 0 0 1px rgba(0,0,0,0.5)`;
+  }
+}
+
+canvasWrap.addEventListener('mouseenter', () => {
+  brushCursor.style.display = 'block';
+  updateCursorStyle();
+});
+canvasWrap.addEventListener('mouseleave', () => {
+  brushCursor.style.display = 'none';
+});
+document.addEventListener('mousemove', (e) => {
+  brushCursor.style.left = e.clientX + 'px';
+  brushCursor.style.top = e.clientY + 'px';
+});
+
+// ── Color harmony generator ──
+function hexToHsl(hex) {
+  let {r,g,b} = hexToRgb(hex);
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max===min){h=s=0;}else{
+    const d=max-min;
+    s=l>0.5?d/(2-max-min):d/(max+min);
+    switch(max){
+      case r:h=((g-b)/d+(g<b?6:0))/6;break;
+      case g:h=((b-r)/d+2)/6;break;
+      case b:h=((r-g)/d+4)/6;break;
+    }
+  }
+  return {h:h*360,s:s*100,l:l*100};
+}
+
+function hslToHex(h,s,l){
+  h/=360;s/=100;l/=100;
+  let r,g,b;
+  if(s===0){r=g=b=l;}else{
+    const hue2rgb=(p,q,t)=>{
+      if(t<0)t+=1;if(t>1)t-=1;
+      if(t<1/6)return p+(q-p)*6*t;
+      if(t<1/2)return q;
+      if(t<2/3)return p+(q-p)*(2/3-t)*6;
+      return p;
+    };
+    const q=l<0.5?l*(1+s):l+s-l*s;
+    const p=2*l-q;
+    r=hue2rgb(p,q,h+1/3);
+    g=hue2rgb(p,q,h);
+    b=hue2rgb(p,q,h-1/3);
+  }
+  const toHex=x=>Math.round(x*255).toString(16).padStart(2,'0');
+  return '#'+toHex(r)+toHex(g)+toHex(b);
+}
+
+function clamp(v,lo,hi){return Math.min(hi,Math.max(lo,v));}
+
+function generateHarmony(hex) {
+  const {h,s,l} = hexToHsl(hex);
+  // Complementary, split-comps, analogues — all richly saturated
+  return [
+    hex, // original
+    hslToHex((h+30)%360, clamp(s+5,30,90), clamp(l+5,25,75)),   // analogue warm
+    hslToHex((h-30+360)%360, clamp(s+5,30,90), clamp(l-5,20,70)), // analogue cool
+    hslToHex((h+150)%360, clamp(s-5,30,90), clamp(l,25,75)),      // split-comp 1
+    hslToHex((h+210)%360, clamp(s,30,90),    clamp(l+8,25,80)),   // split-comp 2
+  ];
+}
+
+// ── Palette sidebar ──
+let paletteColors = generateHarmony(currentColor);
+let activePalIdx = 0;
+
+function renderPalette() {
+  const sidebar = document.getElementById('palette-sidebar');
+  // Remove old swatches
+  sidebar.querySelectorAll('.pal-swatch').forEach(s => s.remove());
+  const label = sidebar.querySelector('.pal-label');
+
+  paletteColors.forEach((color, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'pal-swatch' + (i === activePalIdx ? ' active-swatch' : '');
+    sw.style.background = color;
+    if (i === 0) sw.title = 'Your chosen color';
+    sw.addEventListener('click', () => {
+      activePalIdx = i;
+      currentColor = color;
+      document.getElementById('color-swatch').style.background = color;
+      erasing = false;
+      document.getElementById('btn-pen').classList.add('active-tool');
+      document.getElementById('btn-eraser').classList.remove('active-tool');
+      renderPalette();
+      updateCursorStyle();
+    });
+    sidebar.appendChild(sw);
+  });
+}
+renderPalette();
+
+// ── Color swatch button + picker ──
+const colorSwatch = document.getElementById('color-swatch');
+const colorPick = document.getElementById('color-pick');
+colorSwatch.style.background = currentColor;
+
+let pickerOpen = false;
+
+colorSwatch.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (pickerOpen) {
+    // Close: just hide it
+    pickerOpen = false;
+    colorSwatch.classList.remove('picker-open');
+  } else {
+    pickerOpen = true;
+    colorSwatch.classList.add('picker-open');
+    colorPick.click();
+  }
+});
+
+// When a color is chosen from the picker
+colorPick.addEventListener('input', () => {
+  currentColor = colorPick.value;
+  colorSwatch.style.background = currentColor;
+  paletteColors = generateHarmony(currentColor);
+  activePalIdx = 0;
+  renderPalette();
+  updateCursorStyle();
+});
+
+// Close picker when a color is finally committed
+colorPick.addEventListener('change', () => {
+  pickerOpen = false;
+  colorSwatch.classList.remove('picker-open');
+  currentColor = colorPick.value;
+  colorSwatch.style.background = currentColor;
+  paletteColors = generateHarmony(currentColor);
+  activePalIdx = 0;
+  renderPalette();
+  updateCursorStyle();
+});
+
+document.getElementById('brush-size').addEventListener('input', updateCursorStyle);
+
+// ── Undo / Redo ──
+let undoStack = [];
+let redoStack = [];
+
+function saveSnapshot() {
+  undoStack.push(drawCanvas.toDataURL());
+  if (undoStack.length > 40) undoStack.shift(); // cap memory
+  redoStack = []; // new action clears redo
+  updateUndoButtons();
+}
+
+function updateUndoButtons() {
+  const u = document.getElementById('btn-undo');
+  const r = document.getElementById('btn-redo');
+  if (undoStack.length > 1) u.classList.remove('dimmed'); else u.classList.add('dimmed');
+  if (redoStack.length > 0) r.classList.remove('dimmed'); else r.classList.add('dimmed');
+}
+
+function restoreSnapshot(dataURL) {
+  const img = new Image();
+  img.onload = () => {
+    ctx.clearRect(0, 0, 400, 280);
+    ctx.drawImage(img, 0, 0);
+  };
+  img.src = dataURL;
+}
+
+// Save a blank starting state so first undo goes to empty canvas
+saveSnapshot();
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+  if (undoStack.length <= 1) return; // keep the blank base
+  redoStack.push(undoStack.pop());
+  restoreSnapshot(undoStack[undoStack.length - 1]);
+  updateUndoButtons();
+});
+
+document.getElementById('btn-redo').addEventListener('click', () => {
+  if (!redoStack.length) return;
+  const snap = redoStack.pop();
+  undoStack.push(snap);
+  restoreSnapshot(snap);
+  updateUndoButtons();
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    e.preventDefault();
+    document.getElementById('btn-undo').click();
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+    e.preventDefault();
+    document.getElementById('btn-redo').click();
+  }
+});
+
+// ── Draw helpers ──
+function getPos(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  const scaleX = 400 / r.width, scaleY = 280 / r.height;
+  const src = e.touches ? e.touches[0] : e;
+  return [(src.clientX - r.left) * scaleX, (src.clientY - r.top) * scaleY];
+}
+
+function startDraw(e) {
+  e.preventDefault();
+  isDrawing = true;
+  [lastX, lastY] = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+}
+
+function draw(e) {
+  e.preventDefault();
+  if (!isDrawing) return;
+  const [x, y] = getPos(e);
+  ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = currentColor;
+  ctx.lineWidth = document.getElementById('brush-size').value;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  [lastX, lastY] = [x, y];
+}
+
+function stopDraw() {
+  if (isDrawing) saveSnapshot();
+  isDrawing = false;
+}
+
+drawCanvas.addEventListener('mousedown', startDraw);
+drawCanvas.addEventListener('mousemove', draw);
+drawCanvas.addEventListener('mouseup', stopDraw);
+drawCanvas.addEventListener('mouseleave', stopDraw);
+drawCanvas.addEventListener('touchstart', startDraw, {passive:false});
+drawCanvas.addEventListener('touchmove', draw, {passive:false});
+drawCanvas.addEventListener('touchend', stopDraw);
+
+document.getElementById('btn-pen').addEventListener('click', () => {
+  erasing = false;
+  document.getElementById('btn-pen').classList.add('active-tool');
+  document.getElementById('btn-eraser').classList.remove('active-tool');
+  updateCursorStyle();
+});
+document.getElementById('btn-eraser').addEventListener('click', () => {
+  erasing = true;
+  document.getElementById('btn-eraser').classList.add('active-tool');
+  document.getElementById('btn-pen').classList.remove('active-tool');
+  updateCursorStyle();
+});
+document.getElementById('btn-clear-side').addEventListener('click', () => {
+  ctx.clearRect(0, 0, 400, 280);
+  saveSnapshot();
+});
+
+document.getElementById('observe-btn').addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="race"]').classList.add('active');
+  document.getElementById('panel-race').classList.add('active');
+  startRace();
+});
+
+// ═══════════════════════════════════════════════════
+//  SAVE / LOAD DRAWINGS
+// ═══════════════════════════════════════════════════
+const STORE_KEY = 'drawrace_drawings_v3';
+
+function loadDrawings() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function saveDrawing(dataURL) {
+  const drawings = loadDrawings();
+  drawings.push({ id: Date.now(), data: dataURL, anim: randomAnim() });
+  localStorage.setItem(STORE_KEY, JSON.stringify(drawings));
+  return drawings.length;
+}
+
+function updateCount() {
+  const n = loadDrawings().length;
+  document.getElementById('tab-count').textContent = n > 0 ? `${n} racer${n!==1?'s':''}` : '';
+  const obs = document.getElementById('observe-btn');
+  if (n > 0) obs.classList.add('visible');
+  else obs.classList.remove('visible');
+}
+updateCount();
+
+document.getElementById('save-btn').addEventListener('click', () => {
+  // Check if canvas has anything
+  const data = ctx.getImageData(0, 0, 400, 280).data;
+  const hasContent = data.some((v, i) => i % 4 === 3 && v > 0);
+  if (!hasContent) {
+    const msg = document.getElementById('save-msg');
+    msg.textContent = 'Draw something first! 🎨';
+    msg.classList.add('show');
+    setTimeout(() => msg.classList.remove('show'), 2000);
+    return;
+  }
+  const n = saveDrawing(drawCanvas.toDataURL());
+  updateCount();
+  ctx.clearRect(0, 0, 400, 280);
+  const msg = document.getElementById('save-msg');
+  msg.textContent = n === 1 ? 'First racer added! 🎉' : `Racer #${n} added! 🎉`;
+  msg.classList.add('show');
+  setTimeout(() => msg.classList.remove('show'), 2500);
+});
+
+// ═══════════════════════════════════════════════════
+//  ANIMATIONS
+// ═══════════════════════════════════════════════════
+const ANIMS = [
+  'wobble', 'jitter', 'pulse', 'bounce', 'spin-sway',
+  'wobble+pulse', 'jitter+bounce', 'float'
+];
+
+function randomAnim() {
+  return ANIMS[Math.floor(Math.random() * ANIMS.length)];
+}
+
+// Each racer's animation offset (so they don't sync)
+function applyAnim(type, t, offset) {
+  const o = offset;
+  let dx = 0, dy = 0, sx = 1, sy = 1, rot = 0;
+  const to = t + o;
+
+  const has = (s) => type.includes(s);
+
+  if (has('wobble')) {
+    rot += Math.sin(to * 2.1) * 6;
+    dx += Math.sin(to * 1.7) * 2;
+  }
+  if (has('jitter')) {
+    dx += (Math.random() - 0.5) * 4;
+    dy += (Math.random() - 0.5) * 3;
+  }
+  if (has('pulse')) {
+    const s = 1 + Math.sin(to * 3) * 0.08;
+    sx *= s; sy *= s;
+  }
+  if (has('bounce')) {
+    dy += Math.abs(Math.sin(to * 4)) * -8;
+  }
+  if (has('spin-sway')) {
+    rot += Math.sin(to * 1.3) * 10;
+  }
+  if (has('float')) {
+    dy += Math.sin(to * 1.5) * 5;
+    dx += Math.sin(to * 0.8) * 2;
+  }
+
+  return { dx, dy, sx, sy, rot };
+}
+
+// ═══════════════════════════════════════════════════
+//  AMBIENT MUSIC ENGINE
+// ═══════════════════════════════════════════════════
+let audioCtx = null;
+let musicNodes = [];
+let musicPlaying = false;
+let musicScheduled = false;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+// Master gain
+function getMaster() {
+  if (!audioCtx._master) {
+    const master = audioCtx.createGain();
+    master.gain.value = 0.18;
+    master.connect(audioCtx.destination);
+    audioCtx._master = master;
+    // Soft reverb via convolver simulation using delay+feedback
+    const delay = audioCtx.createDelay(0.6);
+    delay.delayTime.value = 0.38;
+    const feedback = audioCtx.createGain();
+    feedback.gain.value = 0.28;
+    const wet = audioCtx.createGain();
+    wet.gain.value = 0.22;
+    master.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(wet);
+    wet.connect(audioCtx.destination);
+  }
+  return audioCtx._master;
+}
+
+// Gentle sine pad on a single note
+function playPad(freq, startTime, duration, vol=0.12) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(vol, startTime + 0.6);
+  gain.gain.setValueAtTime(vol, startTime + duration - 0.8);
+  gain.gain.linearRampToValueAtTime(0, startTime + duration);
+  osc.connect(gain);
+  gain.connect(getMaster());
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+  return osc;
+}
+
+// Soft triangle arpeggio note
+function playArp(freq, startTime, duration, vol=0.07) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(vol, startTime + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain);
+  gain.connect(getMaster());
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.05);
+  return osc;
+}
+
+// Chord progressions — gentle, dreamy
+const CHORD_SETS = [
+  // C maj → A min → F maj → G maj (classic chill)
+  [[261.6,329.6,392],[220,261.6,329.6],[174.6,220,261.6],[196,246.9,293.7]],
+  // D min → Bb maj → C maj → A min
+  [[293.7,349.2,440],[233.1,293.7,349.2],[261.6,329.6,392],[220,261.6,329.6]],
+  // G maj → E min → C maj → D maj
+  [[196,246.9,293.7],[164.8,196,246.9],[130.8,164.8,196],[146.8,185,220]],
+];
+
+const ARP_SCALES = [
+  [261.6, 293.7, 329.6, 349.2, 392, 440, 493.9, 523.2], // C major
+  [293.7, 329.6, 349.2, 392, 440, 493.9, 523.2, 587.3], // D major
+  [196, 220, 246.9, 261.6, 293.7, 329.6, 370, 392],      // G major
+];
+
+let musicLoopTimeout = null;
+let chordSetIdx = 0;
+let arpScaleIdx = 0;
+
+function scheduleMusicLoop() {
+  if (!musicPlaying || !audioCtx) return;
+  const now = audioCtx.currentTime;
+  const chords = CHORD_SETS[chordSetIdx % CHORD_SETS.length];
+  const scale = ARP_SCALES[arpScaleIdx % ARP_SCALES.length];
+  const barLen = 3.2; // seconds per chord
+  const loopLen = chords.length * barLen;
+
+  // Pads — one per chord
+  chords.forEach((chord, ci) => {
+    const start = now + ci * barLen;
+    chord.forEach(freq => playPad(freq, start, barLen * 0.95, 0.06));
+    // Sub bass
+    playPad(chord[0] * 0.5, start, barLen * 0.9, 0.09);
+  });
+
+  // Arpeggio over the loop
+  let arpTime = now + 0.1;
+  const arpStep = barLen / 8;
+  for (let i = 0; i < chords.length * 8; i++) {
+    const note = scale[Math.floor(Math.random() * scale.length)] * (Math.random() > 0.7 ? 2 : 1);
+    if (Math.random() > 0.25) { // occasional rests
+      playArp(note, arpTime, arpStep * 0.7);
+    }
+    arpTime += arpStep;
+  }
+
+  chordSetIdx++;
+  arpScaleIdx = (arpScaleIdx + 1) % ARP_SCALES.length;
+
+  musicLoopTimeout = setTimeout(scheduleMusicLoop, (loopLen - 0.2) * 1000);
+}
+
+function startMusic() {
+  initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  musicPlaying = true;
+  scheduleMusicLoop();
+  document.getElementById('music-btn').textContent = '🎵 Music: On';
+  document.getElementById('music-btn').classList.add('playing');
+}
+
+function stopMusic() {
+  musicPlaying = false;
+  clearTimeout(musicLoopTimeout);
+  // Fade master out quickly
+  if (audioCtx && audioCtx._master) {
+    audioCtx._master.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.8);
+    setTimeout(() => {
+      if (!musicPlaying && audioCtx._master) {
+        audioCtx._master.gain.value = 0.18;
+        audioCtx.suspend();
+      }
+    }, 900);
+  }
+  document.getElementById('music-btn').textContent = '🎵 Music: Off';
+  document.getElementById('music-btn').classList.remove('playing');
+}
+
+document.getElementById('music-btn').addEventListener('click', () => {
+  if (musicPlaying) stopMusic(); else startMusic();
+});
+
+// ═══════════════════════════════════════════════════
+//  RACE ENGINE
+// ═══════════════════════════════════════════════════
+const raceCanvas = document.getElementById('race-canvas');
+const rCtx = raceCanvas.getContext('2d');
+let racers = [];
+let stars = [];
+let breathPhase = 0;
+let raceRunning = false;
+let rafId = null;
+let groundBumps = [];
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+
+function lerpColor(hex1, hex2, t) {
+  const a = hexToRgb(hex1), b = hexToRgb(hex2);
+  const r = Math.round(a.r + (b.r - a.r) * t);
+  const g = Math.round(a.g + (b.g - a.g) * t);
+  const bl = Math.round(a.b + (b.b - a.b) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
+function initRace() {
+  const W = raceCanvas.width = raceCanvas.offsetWidth;
+  const H = raceCanvas.height = raceCanvas.offsetHeight;
+
+  const drawings = loadDrawings();
+  document.getElementById('empty-state').style.display = drawings.length === 0 ? 'flex' : 'none';
+
+  // Generate stars
+  stars = [];
+  const skyH = H * 0.62;
+  for (let i = 0; i < 160; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * skyH * 0.9,
+      r: Math.random() * 1.5 + 0.3,
+      twinkleOffset: Math.random() * Math.PI * 2,
+      twinkleSpeed: 0.5 + Math.random() * 1.5
+    });
+  }
+
+  // Ground bumps
+  groundBumps = [];
+  for (let i = 0; i < 8; i++) {
+    groundBumps.push({
+      x: Math.random() * W,
+      h: 4 + Math.random() * 14,
+      w: 30 + Math.random() * 80
+    });
+  }
+
+  // Build racers from stored drawings
+  racers = drawings.map((d, i) => {
+    const img = new Image();
+    img.src = d.data;
+    const laneY = getLaneY(i, drawings.length, H);
+    return {
+      img,
+      x: Math.random() * W * 0.5,
+      y: laneY,
+      speed: 0.8 + Math.random() * 0.9,
+      anim: d.anim,
+      animOffset: Math.random() * Math.PI * 2,
+      scale: 0.28 + Math.random() * 0.14,
+      facing: 1,
+      idx: i,
+      floatStart: null,
+      floatEnd: null,
+    };
+  });
+}
+
+function getLaneY(i, total, H) {
+  const skyH = H * 0.62;
+  const groundH = H - skyH;
+  const usable = groundH * 0.72;
+  const startY = skyH + groundH * 0.08;
+  if (total === 1) return startY + usable * 0.3;
+  return startY + (usable / (total - 1 || 1)) * i + Math.random() * 6 - 3;
+}
+
+function drawBackground(t, W, H) {
+  const breath = 0.04 * Math.sin(t * 0.4);
+  const skyH = H * 0.62;
+
+  // Sky gradient — breathing
+  const grad = rCtx.createLinearGradient(0, 0, 0, skyH);
+  grad.addColorStop(0, PAL.skyTop);
+  grad.addColorStop(0.45 + breath * 0.3, PAL.skyMid);
+  grad.addColorStop(1, PAL.skyBot);
+  rCtx.fillStyle = grad;
+  rCtx.fillRect(0, 0, W, skyH);
+
+  // Subtle nebula glow
+  const nebula = rCtx.createRadialGradient(W*0.5, skyH*0.3, 0, W*0.5, skyH*0.3, W*0.6);
+  nebula.addColorStop(0, hexToRgbA(PAL.accent, 0.06 + breath * 0.02));
+  nebula.addColorStop(1, 'transparent');
+  rCtx.fillStyle = nebula;
+  rCtx.fillRect(0, 0, W, skyH);
+
+  // Stars
+  const tStar = t;
+  stars.forEach(s => {
+    const alpha = 0.5 + 0.5 * Math.sin(tStar * s.twinkleSpeed + s.twinkleOffset);
+    rCtx.beginPath();
+    rCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    rCtx.fillStyle = `rgba(${hexToRgb(PAL.starColor).r},${hexToRgb(PAL.starColor).g},${hexToRgb(PAL.starColor).b},${alpha * 0.9})`;
+    rCtx.fill();
+  });
+
+  // Horizon glow
+  const horizGrad = rCtx.createLinearGradient(0, skyH - 40, 0, skyH + 30);
+  horizGrad.addColorStop(0, hexToRgbA(PAL.accent, 0.08));
+  horizGrad.addColorStop(0.5, hexToRgbA(PAL.accent2, 0.12));
+  horizGrad.addColorStop(1, 'transparent');
+  rCtx.fillStyle = horizGrad;
+  rCtx.fillRect(0, skyH - 40, W, 70);
+
+  // Ground
+  const groundGrad = rCtx.createLinearGradient(0, skyH, 0, H);
+  groundGrad.addColorStop(0, PAL.groundTop);
+  groundGrad.addColorStop(0.5, PAL.groundMid);
+  groundGrad.addColorStop(1, PAL.groundBot);
+  rCtx.fillStyle = groundGrad;
+  rCtx.fillRect(0, skyH, W, H - skyH);
+
+  // Ground glow strip (where drawings run)
+  const glowY = skyH + (H - skyH) * 0.1;
+  const gGlow = rCtx.createLinearGradient(0, glowY - 10, 0, glowY + 60);
+  gGlow.addColorStop(0, hexToRgbA(PAL.groundGlow, 0.35 + breath * 0.2));
+  gGlow.addColorStop(1, 'transparent');
+  rCtx.fillStyle = gGlow;
+  rCtx.fillRect(0, glowY - 10, W, 80);
+
+  // Ground texture bumps (distant bushes / rocks)
+  rCtx.fillStyle = hexToRgbA(PAL.groundGlow, 0.3);
+  groundBumps.forEach(b => {
+    rCtx.beginPath();
+    rCtx.ellipse(b.x, skyH + 4, b.w, b.h, 0, Math.PI, 0);
+    rCtx.fill();
+  });
+
+  // Ground line
+  rCtx.strokeStyle = hexToRgbA(PAL.accent2, 0.25);
+  rCtx.lineWidth = 1;
+  rCtx.beginPath();
+  rCtx.moveTo(0, skyH);
+  rCtx.lineTo(W, skyH);
+  rCtx.stroke();
+}
+
+function hexToRgbA(hex, a) {
+  const {r,g,b} = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function drawRacers(t, W, H) {
+  racers.forEach(rc => {
+    if (!rc.img.complete || !rc.img.naturalWidth) return;
+
+    const drawW = rc.img.naturalWidth * rc.scale;
+    const drawH = rc.img.naturalHeight * rc.scale;
+
+    // Move
+    rc.x += rc.speed * rc.facing;
+    if (rc.facing === 1 && rc.x > W + drawW + 20) rc.x = -drawW - 10;
+    else if (rc.facing === -1 && rc.x < -drawW - 20) rc.x = W + drawW + 10;
+
+    let dx = 0, dy = 0, rot = 0, sx = 1, sy = 1;
+
+    // Arc-float override when clicked
+    if (rc.floatStart && t < rc.floatEnd) {
+      const dur = rc.floatEnd - rc.floatStart;
+      const progress = (t - rc.floatStart) / dur; // 0→1
+      // Smooth arch: rise up and back down with a sine curve
+      dy = -Math.sin(progress * Math.PI) * 55;
+      // Full counter-clockwise 360° rotation over the arc
+      rot = -(progress * 360);
+      // slight scale pulse at peak
+      const peak = Math.sin(progress * Math.PI);
+      sx = 1 + peak * 0.12;
+      sy = sx;
+    } else {
+      // Normal anim
+      const a = applyAnim(rc.anim, t, rc.animOffset);
+      dx = a.dx; dy = a.dy; rot = a.rot; sx = a.sx; sy = a.sy;
+      if (rc.floatStart) rc.floatStart = null; // cleanup
+    }
+
+    const cx = rc.x + dx;
+    const cy = rc.y + dy;
+
+    rCtx.save();
+    rCtx.translate(cx, cy);
+    if (rc.facing === -1) rCtx.scale(-1, 1);
+    rCtx.rotate(rot * Math.PI / 180);
+    rCtx.scale(sx, sy);
+    rCtx.drawImage(rc.img, -drawW / 2, -drawH, drawW, drawH);
+    rCtx.restore();
+
+    rc._screenX = cx;
+    rc._screenY = cy;
+    rc._drawW = drawW;
+    rc._drawH = drawH;
+  });
+}
+
+// ── Whoosh sound ──
+function playWhoosh() {
+  if (!audioCtx) initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const now = audioCtx.currentTime;
+  // White noise burst filtered into a whoosh
+  const bufSize = audioCtx.sampleRate * 0.6;
+  const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(800, now);
+  filter.frequency.exponentialRampToValueAtTime(200, now + 0.5);
+  filter.Q.value = 0.8;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start(now);
+}
+
+// Click / tap on race canvas → gentle arc float
+function handleRaceClick(e) {
+  const rect = raceCanvas.getBoundingClientRect();
+  const scaleX = raceCanvas.width / rect.width;
+  const scaleY = raceCanvas.height / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  const cx = (src.clientX - rect.left) * scaleX;
+  const cy = (src.clientY - rect.top) * scaleY;
+  const now = performance.now() / 1000;
+
+  racers.forEach(rc => {
+    if (!rc._screenX) return;
+    const hw = rc._drawW / 2, hh = rc._drawH;
+    if (cx > rc._screenX - hw && cx < rc._screenX + hw &&
+        cy > rc._screenY - hh && cy < rc._screenY + 10) {
+      if (rc.floatStart && now < rc.floatEnd) return; // already floating
+      rc.floatStart = now;
+      rc.floatEnd = now + 2.2;
+      playWhoosh();
+    }
+  });
+}
+raceCanvas.addEventListener('click', handleRaceClick);
+raceCanvas.addEventListener('touchstart', handleRaceClick, {passive: true});
+
+// ═══════════════════════════════════════════════════
+//  CHAOS SOUND ENGINE 😈
+//  (set CHAOS_ENABLED = false to silence all chaos)
+// ═══════════════════════════════════════════════════
+let CHAOS_ENABLED = true;
+let chaosWatchTime = 0;      // accumulated watch seconds
+let chaosLastTick = null;    // performance.now() of last frame while on race tab
+let chaosNextTrigger = null; // accumulated seconds until next chaos event
+let chaosTimeout = null;
+
+function resetChaosTimer() {
+  chaosNextTrigger = 62 + Math.random() * 45; // 62–107s first trigger
+}
+resetChaosTimer();
+
+// Synthesized scream — rising then falling shriek
+function playScream() {
+  if (!audioCtx) initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const now = audioCtx.currentTime;
+  const dur = 1.4 + Math.random() * 0.8;
+
+  // Main shriek osc
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sawtooth';
+  const startFreq = 300 + Math.random() * 200;
+  osc.frequency.setValueAtTime(startFreq, now);
+  osc.frequency.linearRampToValueAtTime(startFreq * 3.5, now + dur * 0.3);
+  osc.frequency.linearRampToValueAtTime(startFreq * 0.6, now + dur);
+
+  // Slight vibrato
+  const vib = audioCtx.createOscillator();
+  vib.frequency.value = 14 + Math.random() * 6;
+  const vibGain = audioCtx.createGain();
+  vibGain.gain.value = 25;
+  vib.connect(vibGain);
+  vibGain.connect(osc.frequency);
+
+  // Distortion
+  const wave = audioCtx.createWaveShaper();
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2) / 256 - 1;
+    curve[i] = (Math.PI + 300) * x / (Math.PI + 300 * Math.abs(x));
+  }
+  wave.curve = curve;
+
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.55, now + 0.06);
+  gain.gain.setValueAtTime(0.55, now + dur - 0.25);
+  gain.gain.linearRampToValueAtTime(0, now + dur);
+
+  osc.connect(wave);
+  wave.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + dur + 0.1);
+  vib.start(now); vib.stop(now + dur + 0.1);
+}
+
+// Chip crunching — short bursts of filtered noise
+function playChips() {
+  if (!audioCtx) initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const crunches = 4 + Math.floor(Math.random() * 5);
+  for (let c = 0; c < crunches; c++) {
+    const delay = c * (0.12 + Math.random() * 0.18);
+    const now = audioCtx.currentTime + delay;
+    const bufSize = Math.floor(audioCtx.sampleRate * (0.04 + Math.random() * 0.06));
+    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'highshelf';
+    filter.frequency.value = 2000;
+    filter.gain.value = 12;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.45 + Math.random() * 0.25, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + bufSize / audioCtx.sampleRate);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(now);
+  }
+}
+
+const CHAOS_EVENTS = [
+  { name: 'scream', fn: playScream, weight: 3 },
+  { name: 'chips',  fn: playChips,  weight: 2 },
+  { name: 'scream', fn: playScream, weight: 1 }, // double weight screams
+];
+
+function fireChaosEvent() {
+  if (!CHAOS_ENABLED) return;
+  const total = CHAOS_EVENTS.reduce((s, e) => s + e.weight, 0);
+  let r = Math.random() * total;
+  for (const ev of CHAOS_EVENTS) {
+    r -= ev.weight;
+    if (r <= 0) { ev.fn(); break; }
+  }
+  // Schedule next one: 62–120s accumulated watch time
+  chaosNextTrigger = chaosWatchTime + 62 + Math.random() * 58;
+}
+
+// Called every race loop frame to accumulate watch time
+function tickChaos(ts) {
+  if (!CHAOS_ENABLED) return;
+  const now = ts;
+  if (chaosLastTick !== null) {
+    const delta = Math.min((now - chaosLastTick) / 1000, 0.5); // cap at 0.5s
+    chaosWatchTime += delta;
+    if (chaosWatchTime >= chaosNextTrigger) {
+      fireChaosEvent();
+    }
+  }
+  chaosLastTick = now;
+}
+
+// Reset chaos tick when leaving race tab (so time doesn't accumulate in background)
+function pauseChaosTick() { chaosLastTick = null; }
+function resumeChaosTick() { chaosLastTick = performance.now(); }
+
+let lastTime = 0;
+function raceLoop(ts) {
+  const t = ts / 1000;
+  const W = raceCanvas.width;
+  const H = raceCanvas.height;
+
+  rCtx.clearRect(0, 0, W, H);
+  drawBackground(t, W, H);
+  drawRacers(t, W, H);
+  tickChaos(ts);
+
+  rafId = requestAnimationFrame(raceLoop);
+}
+
+function startRace() {
+  if (rafId) cancelAnimationFrame(rafId);
+  initRace();
+  if (loadDrawings().length > 0) {
+    rafId = requestAnimationFrame(raceLoop);
+  }
+}
+
+// Resize handler
+window.addEventListener('resize', () => {
+  if (document.querySelector('.tab-btn[data-tab="race"]').classList.contains('active')) {
+    startRace();
+  }
+});
+</script>
+</body>
+</html>
